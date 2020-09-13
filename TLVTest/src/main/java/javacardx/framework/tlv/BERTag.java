@@ -1,5 +1,7 @@
 package javacardx.framework.tlv;
 
+import com.jaloonz.tlv.utils.JCEnvironmentExceptions;
+
 import javacardx.framework.Util;
 
 /**
@@ -7,9 +9,9 @@ import javacardx.framework.Util;
  * allowed encoding of the Tag field are based on the ASN.1 BER encoding rules
  * of ISO/IEC 8825-1:2002.
  * <p/>
- * The BERTag class and the subclasses ConstructedBERTag and PrimitiveBERTag,
- * also provide static methods to parse or edit a BER Tag structure
- * representation in a byte array.
+ * The {@link BERTag} class and the subclasses {@link ConstructedBERTag} and
+ * {@link PrimitiveBERTag}, also provide static methods to parse or edit a BER
+ * Tag structure representation in a byte array.
  */
 public abstract class BERTag {
 	public static final byte BER_TAG_CLASS_MASK_APPLICATION = 1;
@@ -18,6 +20,9 @@ public abstract class BERTag {
 	public static final byte BER_TAG_CLASS_MASK_UNIVERSAL = 0;
 	public static final boolean BER_TAG_TYPE_CONSTRUCTED = true;
 	public static final boolean BER_TAG_TYPE_PRIMITIVE = false;
+	protected static final byte MASK_TAG_NUMBER = 0x1F;
+	protected static final byte MASK_MORE_BYTES = (byte) 0x80;
+	protected static final byte ASN1_EOC = 0x00;
 	private static byte[] buffer;
 	protected byte[] tagBytes;
 
@@ -56,7 +61,7 @@ public abstract class BERTag {
 	public static BERTag getInstance(byte[] bArray, short bOff)
 			throws ArrayIndexOutOfBoundsException, NullPointerException, TLVException {
 		BERTag tag = null;
-		
+
 		if (isConstructed(bArray, bOff)) {
 			tag = new ConstructedBERTag();
 		} else {
@@ -99,35 +104,35 @@ public abstract class BERTag {
 			throws ArrayIndexOutOfBoundsException, NullPointerException, TLVException {
 
 		if (outArray == null)
-			throw new NullPointerException();
+			JCEnvironmentExceptions.throwNullPointerException();
 
 		if (tagClass > BER_TAG_CLASS_MASK_PRIVATE || tagClass < BER_TAG_CLASS_MASK_UNIVERSAL || tagNumber < 0)
-			throw new TLVException(TLVException.INVALID_PARAM);
+			TLVException.throwIt(TLVException.INVALID_PARAM);
 
 		if (tagNumber >= 32767)
-			throw new TLVException(TLVException.ILLEGAL_SIZE);
+			TLVException.throwIt(TLVException.ILLEGAL_SIZE);
 
 		if (outArray.length < bOff)
-			throw new ArrayIndexOutOfBoundsException();
+			JCEnvironmentExceptions.throwArrayIndexOutOfBoundsException();
 
-		if (tagNumber < 0x1F) {
+		if (tagNumber < MASK_TAG_NUMBER) {
 			byte tag = 0;
 			tag |= (((tagClass & 0x03) << 6) & 0xFF);
 			tag |= ((isConstructed ? 0x20 : 0x00) & 0xFF);
-			tag |= ((tagNumber & 0x1F) & 0xFF);
+			tag |= ((tagNumber & MASK_TAG_NUMBER) & 0xFF);
 			outArray[bOff] = tag;
 			return 1;
 		} else {
 			byte tag = 0;
 			tag |= (((tagClass & 0x03) << 6) & 0xFF);
 			tag |= ((isConstructed ? 0x20 : 0x00) & 0xFF);
-			tag |= ((0x1F) & 0xFF);
+			tag |= (MASK_TAG_NUMBER);
 			outArray[bOff] = tag;
 
 			short byteCounter = 0;
 			short tagBytesTester = tagNumber;
 			do {
-				buffer[byteCounter++] = (byte) ((byte) (tagBytesTester & 0x7F) | 0x80);
+				buffer[byteCounter++] = (byte) ((byte) (tagBytesTester & 0x7F) | MASK_MORE_BYTES);
 				tagBytesTester >>= 7;
 			} while (tagBytesTester != 0);
 
@@ -168,26 +173,26 @@ public abstract class BERTag {
 			throws ArrayIndexOutOfBoundsException, NullPointerException, TLVException {
 
 		if (berTagArray == null)
-			throw new NullPointerException();
+			JCEnvironmentExceptions.throwNullPointerException();
 
 		short tagOff = bOff;
 		short length = (short) berTagArray.length;
 		byte tag = berTagArray[tagOff++];
-		if ((tag & 0x1f) == 0x1f) {
-			while ((berTagArray[tagOff] & 0x80) != 0) {
+		if ((tag & MASK_TAG_NUMBER) == MASK_TAG_NUMBER) {
+			while ((berTagArray[tagOff] & MASK_MORE_BYTES) != 0) {
 				tagOff++;
 				if (tagOff - bOff > length) {
-					throw new ArrayIndexOutOfBoundsException();
+					JCEnvironmentExceptions.throwArrayIndexOutOfBoundsException();
 				}
 			}
 			tagOff++;
 			if (tagOff - bOff > length) {
-				throw new ArrayIndexOutOfBoundsException();
+				JCEnvironmentExceptions.throwArrayIndexOutOfBoundsException();
 			}
 		}
 		short tagLen = (short) (tagOff - bOff);
 		if (tagLen > 4)
-			throw new TLVException(TLVException.ILLEGAL_SIZE);
+			TLVException.throwIt(TLVException.ILLEGAL_SIZE);
 		return tagLen;
 	}
 
@@ -220,31 +225,31 @@ public abstract class BERTag {
 			throws ArrayIndexOutOfBoundsException, NullPointerException, TLVException {
 
 		if (berTagArray == null)
-			throw new TLVException(TLVException.EMPTY_TAG);
+			TLVException.throwIt(TLVException.EMPTY_TAG);
 
 		short tagOff = bOff;
 		short tag = berTagArray[tagOff++];
-		if ((tag & 0x1f) == 0x1f) {
+		if ((tag & MASK_TAG_NUMBER) == MASK_TAG_NUMBER) {
 			tag = 0;
-			if (((berTagArray[tagOff] & 0x80) == 0x80) && //
-					((berTagArray[tagOff + 1] & 0x80) == 0x80) && //
-					((berTagArray[tagOff + 2] & 0x80) == 0x80)) {
-				throw new TLVException(TLVException.TAG_NUMBER_GREATER_THAN_32767);
-			} else if (((berTagArray[tagOff] & 0x80) == 0x80) && //
-					((berTagArray[tagOff + 1] & 0x80) == 0x80) && //
-					((berTagArray[tagOff + 2] & 0x80) == 0x00)) {
+			if (((berTagArray[tagOff] & MASK_MORE_BYTES) == MASK_MORE_BYTES) && //
+					((berTagArray[tagOff + 1] & MASK_MORE_BYTES) == MASK_MORE_BYTES) && //
+					((berTagArray[tagOff + 2] & MASK_MORE_BYTES) == MASK_MORE_BYTES)) {
+				TLVException.throwIt(TLVException.TAG_NUMBER_GREATER_THAN_32767);
+			} else if (((berTagArray[tagOff] & MASK_MORE_BYTES) == MASK_MORE_BYTES) && //
+					((berTagArray[tagOff + 1] & MASK_MORE_BYTES) == MASK_MORE_BYTES) && //
+					((berTagArray[tagOff + 2] & MASK_MORE_BYTES) == 0x00)) {
 				if ((berTagArray[tagOff] & 0x7E) != 0x00)
-					throw new TLVException(TLVException.TAG_NUMBER_GREATER_THAN_32767);
+					TLVException.throwIt(TLVException.TAG_NUMBER_GREATER_THAN_32767);
 
 				tag = (short) (((berTagArray[tagOff] & 0x01) << 14) | //
 						((berTagArray[tagOff + 1] & 0x7F) << 7) | //
 						((berTagArray[tagOff + 2] & 0x7F) << 0));
-			} else if (((berTagArray[tagOff] & 0x80) == 0x80) && //
-					((berTagArray[tagOff + 1] & 0x80) == 0x00)) {
+			} else if (((berTagArray[tagOff] & MASK_MORE_BYTES) == MASK_MORE_BYTES) && //
+					((berTagArray[tagOff + 1] & MASK_MORE_BYTES) == 0x00)) {
 				tag = (short) (((berTagArray[tagOff] & 0x7F) << 7) | //
 						((berTagArray[tagOff + 1] & 0x7F) << 0));
 			}
-			if (((berTagArray[tagOff] & 0x80) == 0x00)) {
+			if (((berTagArray[tagOff] & MASK_MORE_BYTES) == 0x00)) {
 				tag = (short) ((berTagArray[tagOff] & 0x7F) << 0);
 			}
 		} else {
@@ -276,7 +281,7 @@ public abstract class BERTag {
 	public static byte tagClass(byte[] berTagArray, short bOff)
 			throws ArrayIndexOutOfBoundsException, NullPointerException, TLVException {
 		if (berTagArray == null)
-			throw new TLVException(TLVException.EMPTY_TAG);
+			TLVException.throwIt(TLVException.EMPTY_TAG);
 		byte tagClass = (byte) ((berTagArray[bOff] & 0xC0) >>> 6);
 		return tagClass;
 	}
@@ -323,7 +328,7 @@ public abstract class BERTag {
 	public static boolean isConstructed(byte[] berTagArray, short bOff)
 			throws ArrayIndexOutOfBoundsException, NullPointerException, TLVException {
 		if (berTagArray == null)
-			throw new TLVException(TLVException.EMPTY_TAG);
+			TLVException.throwIt(TLVException.EMPTY_TAG);
 
 		boolean bitConstructed = ((berTagArray[bOff] & 0x20) == 0x20);
 		if (bitConstructed)
@@ -368,9 +373,9 @@ public abstract class BERTag {
 	 */
 	public byte size() throws TLVException {
 		if (tagBytes == null)
-			throw new TLVException(TLVException.EMPTY_TAG);
+			TLVException.throwIt(TLVException.EMPTY_TAG);
 		if (tagBytes.length > 127)
-			throw new TLVException(TLVException.TAG_SIZE_GREATER_THAN_127);
+			TLVException.throwIt(TLVException.TAG_SIZE_GREATER_THAN_127);
 		return (byte) tagBytes.length;
 	}
 
@@ -394,12 +399,13 @@ public abstract class BERTag {
 	public short toBytes(byte[] outBuf, short bOffset)
 			throws ArrayIndexOutOfBoundsException, NullPointerException, TLVException {
 		if (outBuf == null)
-			throw new NullPointerException();
+			JCEnvironmentExceptions.throwNullPointerException();
 		if (tagBytes == null)
-			throw new TLVException(TLVException.EMPTY_TAG);
+			TLVException.throwIt(TLVException.EMPTY_TAG);
 		if (outBuf.length < bOffset + tagBytes.length)
-			throw new ArrayIndexOutOfBoundsException();
-		return Util.arrayCopy(tagBytes, (short) 0, outBuf, bOffset, (short) tagBytes.length);
+			JCEnvironmentExceptions.throwArrayIndexOutOfBoundsException();
+		Util.arrayCopy(tagBytes, (short) 0, outBuf, bOffset, (short) tagBytes.length);
+		return (short) tagBytes.length;
 	}
 
 	/**

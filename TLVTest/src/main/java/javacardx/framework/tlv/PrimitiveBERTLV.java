@@ -4,9 +4,39 @@ import java.util.Arrays;
 
 import org.apache.commons.codec.binary.Hex;
 
+import com.jaloonz.tlv.utils.JCEnvironmentExceptions;
+import com.jaloonz.tlv.utils.LogHelper;
+import com.jaloonz.tlv.utils.TLVHelper;
+
 import javacardx.framework.Util;
 
+/**
+ * The PrimitiveBERTLV class encapsulates a primitive BER TLV structure. It
+ * extends the generic BERTLV class. The rules on the allowed encoding of the
+ * Tag, length and value fields is based on the ASN.1 BER encoding rules ISO/IEC
+ * 8825-1:2002.
+ * <p/>
+ * The PrimitiveBERTLV class only supports encoding of the length(L) octets in
+ * definite form. The value(V) field which encodes the contents octets are
+ * merely viewed as a series of bytes.
+ * <p/>
+ * Every PrimitiveBERTLV has a capacity which represents the allocated internal
+ * buffer to represent the Value of this TLV object. As long as the number of
+ * bytes required to represent the Value of the TLV object does not exceed the
+ * capacity, it is not necessary to allocate additional internal buffer space.
+ * If the internal buffer overflows, and the implementation supports automatic
+ * expansion which might require new data allocation and possibly old
+ * data/object deletion, it is automatically made larger. Otherwise a
+ * TLVException is thrown.
+ * <p/>
+ * The {@link BERTLV} class and the subclasses {@link ConstructedBERTLV} and
+ * {@link PrimitiveBERTLV}, also provide static methods to parse or edit a TLV
+ * structure representation in a byte array.
+ */
 public class PrimitiveBERTLV extends BERTLV {
+
+	protected byte[] mData;
+	protected short mDataSize = 0;
 
 	/**
 	 * Constructor creates an empty PrimitiveBERTLV object capable of encapsulating
@@ -23,15 +53,38 @@ public class PrimitiveBERTLV extends BERTLV {
 		resizeDataBuffer(numValueBytes);
 	}
 
+	/**
+	 * Resizes data array.
+	 * 
+	 * @param numValueBytes is the number of Value bytes to allocate
+	 * @return true if capacity is sufficient, false otherwise
+	 */
+	private boolean resizeDataBuffer(short numValueBytes) {
+
+		if (mData == null) {
+			mData = new byte[numValueBytes];
+			return true;
+		} else if (SUPPORT_EXPANSION) {
+			if (mData.length < numValueBytes) {
+				byte[] newArray = new byte[numValueBytes];
+				Util.arrayCopyNonAtomic(mData, (short) 0, newArray, (short) 0, mDataSize);
+				mData = newArray;
+			}
+			return true;
+		} else {
+			return false;
+		}
+	}
+
 	@Override
 	public short init(byte[] bArray, short bOff, short bLen)
 			throws ArrayIndexOutOfBoundsException, NullPointerException, TLVException {
 
 		if (bArray == null)
-			throw new NullPointerException();
+			JCEnvironmentExceptions.throwNullPointerException();
 
 		if (bOff + bLen > bArray.length)
-			throw new ArrayIndexOutOfBoundsException();
+			JCEnvironmentExceptions.throwArrayIndexOutOfBoundsException();
 
 		short bOffset = bOff;
 		short tagLen, lenLen, dataLen = 0;
@@ -41,11 +94,11 @@ public class PrimitiveBERTLV extends BERTLV {
 		bOffset += tagLen;
 
 		dataLen = getLength(bArray, bOffset);
-		lenLen = getLengthLength(bArray, bOffset);
+		lenLen = TLVHelper.getLengthLength(bArray, bOffset);
 		bOffset += lenLen;
 
 		if (bOffset > bArray.length)
-			throw new ArrayIndexOutOfBoundsException();
+			JCEnvironmentExceptions.throwArrayIndexOutOfBoundsException();
 
 		// Allow to initialise PrimitiveBERTLV, ignoring remaining
 		// data (i.e. capture only the TLV itself).
@@ -84,10 +137,10 @@ public class PrimitiveBERTLV extends BERTLV {
 			throws ArrayIndexOutOfBoundsException, NullPointerException, TLVException {
 
 		if (tag == null || vArray == null)
-			throw new NullPointerException();
+			JCEnvironmentExceptions.throwNullPointerException();
 
 		if (vOff + vLen > vArray.length)
-			throw new ArrayIndexOutOfBoundsException();
+			JCEnvironmentExceptions.throwArrayIndexOutOfBoundsException();
 
 		this.mTag = tag;
 		return appendValue(vArray, vOff, vLen);
@@ -120,16 +173,16 @@ public class PrimitiveBERTLV extends BERTLV {
 			throws ArrayIndexOutOfBoundsException, NullPointerException, TLVException {
 
 		if (mTag == null || mData == null)
-			throw new TLVException(TLVException.EMPTY_TLV);
+			TLVException.throwIt(TLVException.EMPTY_TLV);
 
 		if (vArray == null)
-			throw new NullPointerException();
+			JCEnvironmentExceptions.throwNullPointerException();
 
 		if (vOff + vLen > vArray.length)
-			throw new ArrayIndexOutOfBoundsException();
+			JCEnvironmentExceptions.throwArrayIndexOutOfBoundsException();
 
 		if (!resizeDataBuffer((short) (mDataSize + vLen)))
-			throw new TLVException(TLVException.INSUFFICIENT_STORAGE);
+			TLVException.throwIt(TLVException.INSUFFICIENT_STORAGE);
 
 		Util.arrayCopyNonAtomic(vArray, vOff, mData, mDataSize, vLen);
 		mDataSize += vLen;
@@ -167,16 +220,16 @@ public class PrimitiveBERTLV extends BERTLV {
 			throws ArrayIndexOutOfBoundsException, NullPointerException, TLVException {
 
 		if (mTag == null || mData == null)
-			throw new TLVException(TLVException.EMPTY_TLV);
+			TLVException.throwIt(TLVException.EMPTY_TLV);
 
 		if (vArray == null)
-			throw new NullPointerException();
+			JCEnvironmentExceptions.throwNullPointerException();
 
 		if (vOff + vLen > vArray.length)
-			throw new ArrayIndexOutOfBoundsException();
+			JCEnvironmentExceptions.throwArrayIndexOutOfBoundsException();
 
 		if (!resizeDataBuffer((short) (vLen)))
-			throw new TLVException(TLVException.INSUFFICIENT_STORAGE);
+			TLVException.throwIt(TLVException.INSUFFICIENT_STORAGE);
 
 		Util.arrayCopyNonAtomic(vArray, vOff, mData, (short) 0, vLen);
 		mDataSize = vLen;
@@ -211,10 +264,10 @@ public class PrimitiveBERTLV extends BERTLV {
 			throws ArrayIndexOutOfBoundsException, NullPointerException, TLVException {
 
 		if (tlvValue == null)
-			throw new NullPointerException();
+			JCEnvironmentExceptions.throwNullPointerException();
 
 		if (tOff + mDataSize > tlvValue.length)
-			throw new ArrayIndexOutOfBoundsException();
+			JCEnvironmentExceptions.throwArrayIndexOutOfBoundsException();
 
 		Util.arrayCopyNonAtomic(mData, (short) 0, tlvValue, tOff, mDataSize);
 		return mDataSize;
@@ -248,11 +301,11 @@ public class PrimitiveBERTLV extends BERTLV {
 			throws ArrayIndexOutOfBoundsException, NullPointerException, TLVException {
 
 		if (berTLVArray == null)
-			throw new NullPointerException();
+			JCEnvironmentExceptions.throwNullPointerException();
 
 		short tagLen, lenLen;
 		tagLen = BERTag.size(berTLVArray, bTLVOff);
-		lenLen = getLengthLength(berTLVArray, (short) (bTLVOff + tagLen));
+		lenLen = TLVHelper.getLengthLength(berTLVArray, (short) (bTLVOff + tagLen));
 		return (short) (bTLVOff + tagLen + lenLen);
 	}
 
@@ -296,10 +349,10 @@ public class PrimitiveBERTLV extends BERTLV {
 			byte[] outBuf, short bOff) throws ArrayIndexOutOfBoundsException, NullPointerException, TLVException {
 
 		if (berTagArray == null || valueArray == null || outBuf == null)
-			throw new NullPointerException();
+			JCEnvironmentExceptions.throwNullPointerException();
 
 		if (vOff + vLen > valueArray.length)
-			throw new ArrayIndexOutOfBoundsException();
+			JCEnvironmentExceptions.throwArrayIndexOutOfBoundsException();
 
 		short tagLen;
 		short outBufOffset = bOff;
@@ -361,14 +414,14 @@ public class PrimitiveBERTLV extends BERTLV {
 			throws ArrayIndexOutOfBoundsException, NullPointerException, TLVException {
 
 		if (berTLVArray == null || vArray == null)
-			throw new NullPointerException();
+			JCEnvironmentExceptions.throwNullPointerException();
 
 		if (vOff + vLen > vArray.length)
-			throw new ArrayIndexOutOfBoundsException();
+			JCEnvironmentExceptions.throwArrayIndexOutOfBoundsException();
 
 		BERTLV tlv = BERTLV.getInstance(berTLVArray, bTLVOff, bTLVOff);
-		if (tlv.mTag.isConstructed())
-			throw new TLVException(TLVException.MALFORMED_TLV);
+		if (tlv.mTag == null || tlv.mTag.isConstructed())
+			TLVException.throwIt(TLVException.MALFORMED_TLV);
 
 		PrimitiveBERTLV ptlv = (PrimitiveBERTLV) tlv;
 		ptlv.appendValue(vArray, vOff, vLen);
@@ -378,7 +431,7 @@ public class PrimitiveBERTLV extends BERTLV {
 	@Override
 	public String getDescription(short level) {
 		StringBuilder sb = new StringBuilder();
-		sb.append(drawLevel(level));
+		sb.append(LogHelper.drawLevel(level));
 		if (mTag != null) {
 			sb.append(String.format("T=%s, L=%d, V=%s\n", mTag.toString(), mDataSize,
 					Hex.encodeHexString(Arrays.copyOf(mData, mDataSize), false)));
@@ -386,5 +439,15 @@ public class PrimitiveBERTLV extends BERTLV {
 			sb.append("Invalid TLV");
 		}
 		return sb.toString();
+	}
+
+	@Override
+	protected short writeData(byte[] outArray, short bOff) {
+		return Util.arrayCopy(mData, (short) 0, outArray, bOff, mDataSize);
+	}
+
+	@Override
+	protected short getDataLength() {
+		return mDataSize;
 	}
 }

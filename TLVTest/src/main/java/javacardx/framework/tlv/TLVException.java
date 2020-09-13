@@ -1,7 +1,20 @@
 package javacardx.framework.tlv;
 
+import com.jaloonz.tlv.utils.JCEnvironmentExceptions;
+
 import javacardx.framework.CardRuntimeException;
 
+/**
+ * TLVException represents a TLV-related exception.
+ * <p/>
+ * The API classes throw Java Card runtime environment-owned instances of
+ * TLVException.
+ * <p/>
+ * Java Card runtime environment-owned instances of exception classes are
+ * temporary Java Card runtime environment Entry Point Objects and can be
+ * accessed from any applet context. References to these temporary objects
+ * cannot be stored in class variables, instance variables, or array components.
+ */
 public class TLVException extends CardRuntimeException {
 	private static final long serialVersionUID = -778574823780925536L;
 	public static final short EMPTY_TAG = 3;
@@ -42,6 +55,6 @@ public class TLVException extends CardRuntimeException {
 	 * @throws TLVException always
 	 */
 	public static void throwIt(short reason) throws TLVException {
-		throw new TLVException(reason);
+		JCEnvironmentExceptions.throwTLVException(reason);
 	}
 }

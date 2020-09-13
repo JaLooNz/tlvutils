@@ -1,5 +1,8 @@
 package javacardx.framework.tlv;
 
+import com.jaloonz.tlv.utils.JCEnvironmentExceptions;
+import com.jaloonz.tlv.utils.TLVHelper;
+
 import javacardx.framework.Util;
 
 /**
@@ -7,20 +10,20 @@ import javacardx.framework.Util;
  * allowed encoding of the Tag, length and value fields are based on the ASN.1
  * BER encoding rules ISO/IEC 8825-1:2002.
  * <p/>
- * The BERTLV class and the subclasses - ConstructedBERTLV and PrimitiveBERTLV
- * only support encoding of the length(L) octets in definite form. These classes
- * do not provide support for the encoding rules of the contents octets of the
- * value(V) field as described in ISO/IEC 8825-1:2002. The BERTLV class and the
- * subclasses - ConstructedBERTLV and PrimitiveBERTLV also provide static
- * methods to parse/edit a TLV structure representation in a byte array.
+ * The {@link BERTLV} class and the subclasses - {@link ConstructedBERTLV} and
+ * {@link PrimitiveBERTLV} only support encoding of the length(L) octets in
+ * definite form. These classes do not provide support for the encoding rules of
+ * the contents octets of the value(V) field as described in ISO/IEC
+ * 8825-1:2002.
+ * <p/>
+ * The {@link BERTLV} class and the subclasses - {@link ConstructedBERTLV} and
+ * {@link PrimitiveBERTLV} also provide static methods to parse/edit a TLV
+ * structure representation in a byte array.
  */
 public abstract class BERTLV {
 
 	protected BERTag mTag;
-	protected byte[] mData;
-	protected short mDataSize = 0;
 	protected static final boolean SUPPORT_EXPANSION = true;
-	protected static final byte ASN1_EOC = 0x00;
 
 	/**
 	 * Constructor creates an empty BERTLV object capable of encapsulating a BER TLV
@@ -101,31 +104,23 @@ public abstract class BERTLV {
 			throws ArrayIndexOutOfBoundsException, NullPointerException, TLVException {
 
 		if (bOff + bLen > bArray.length)
-			throw new ArrayIndexOutOfBoundsException();
+			JCEnvironmentExceptions.throwArrayIndexOutOfBoundsException();
 
 		short bOffset = bOff;
 		short tagLen, lenLen, dataLen = 0;
-		boolean isConstructed, isSequentialTLVs;
+		boolean isConstructed;
 
 		tagLen = BERTag.size(bArray, bOffset);
 		isConstructed = BERTag.isConstructed(bArray, bOffset);
 		bOffset += tagLen;
 
 		dataLen = getLength(bArray, bOffset);
-		lenLen = getLengthLength(bArray, bOffset);
+		lenLen = TLVHelper.getLengthLength(bArray, bOffset);
 		bOffset += lenLen;
 
 		bOffset += dataLen;
-		
-//		if (tagLen+lenLen+dataLen != bLen)
-//			isSequentialTLVs = true;
-//		else 
-//			isSequentialTLVs = false;
 
 		BERTLV tlv = null;
-//		if (isSequentialTLVs) {
-//			
-//		}else 
 		if (isConstructed) {
 			tlv = new ConstructedBERTLV((short) 0);
 		} else {
@@ -161,31 +156,34 @@ public abstract class BERTLV {
 			throws ArrayIndexOutOfBoundsException, NullPointerException, TLVException {
 
 		if (outBuf == null)
-			throw new NullPointerException();
+			JCEnvironmentExceptions.throwNullPointerException();
 
-		if (mTag == null || mData == null)
-			throw new TLVException(TLVException.EMPTY_TLV);
+		if (mTag == null)
+			TLVException.throwIt(TLVException.EMPTY_TLV);
 
+		short tagLen, dataLen;
 		short outBufOffset = bOff;
-		outBufOffset += mTag.toBytes(outBuf, outBufOffset);
+		tagLen = mTag.toBytes(outBuf, outBufOffset);
+		outBufOffset += tagLen;
 
-		if (mData.length < 128) {
-			outBuf[outBufOffset++] = (byte) mData.length;
-		} else if (mData.length < 256) {
+		dataLen = getLength();
+		if (dataLen < 128) {
+			outBuf[outBufOffset++] = (byte) dataLen;
+		} else if (dataLen < 256) {
 			outBuf[outBufOffset++] = (byte) 0x81;
-			outBuf[outBufOffset++] = (byte) mData.length;
-		} else if (mData.length < 65536) {
+			outBuf[outBufOffset++] = (byte) dataLen;
+		} else if (dataLen < 65536) {
 			outBuf[outBufOffset++] = (byte) 0x82;
-			outBuf[outBufOffset++] = (byte) ((mData.length >> 8) & 0xFF);
-			outBuf[outBufOffset++] = (byte) (mData.length & 0xFF);
+			outBuf[outBufOffset++] = (byte) ((dataLen >> 8) & 0xFF);
+			outBuf[outBufOffset++] = (byte) (dataLen & 0xFF);
 		} else {
 			outBuf[outBufOffset++] = (byte) 0x83;
-			outBuf[outBufOffset++] = (byte) ((mData.length >> 16) & 0xFF);
-			outBuf[outBufOffset++] = (byte) ((mData.length >> 8) & 0xFF);
-			outBuf[outBufOffset++] = (byte) (mData.length & 0xFF);
+			outBuf[outBufOffset++] = (byte) ((dataLen >> 16) & 0xFF);
+			outBuf[outBufOffset++] = (byte) ((dataLen >> 8) & 0xFF);
+			outBuf[outBufOffset++] = (byte) (dataLen & 0xFF);
 		}
 
-		outBufOffset += Util.arrayCopyNonAtomic(mData, (short) 0, outBuf, outBufOffset, (short) mData.length);
+		outBufOffset = writeData(outBuf, outBufOffset);
 
 		return (short) (outBufOffset - bOff);
 	}
@@ -202,8 +200,8 @@ public abstract class BERTLV {
 	 */
 	public BERTag getTag() throws TLVException {
 
-		if (mData == null)
-			throw new TLVException(TLVException.EMPTY_TLV);
+		if (mTag == null)
+			TLVException.throwIt(TLVException.EMPTY_TLV);
 
 		return mTag;
 	}
@@ -222,13 +220,14 @@ public abstract class BERTLV {
 	 */
 	public short getLength() throws TLVException {
 
-		if (mData == null)
-			throw new TLVException(TLVException.EMPTY_TLV);
+		if (mTag == null)
+			TLVException.throwIt(TLVException.EMPTY_TLV);
 
-		if (mData.length > 32767)
-			throw new TLVException(TLVException.TLV_LENGTH_GREATER_THAN_32767);
+		short dataLen = getDataLength();
+		if (dataLen > 32767)
+			TLVException.throwIt(TLVException.TLV_LENGTH_GREATER_THAN_32767);
 
-		return (short) mData.length;
+		return (short) dataLen;
 	}
 
 	/**
@@ -245,7 +244,8 @@ public abstract class BERTLV {
 	 */
 	public short size() throws NullPointerException, TLVException {
 
-		return (short) (mTag.size() + getLengthLength(mDataSize) + mDataSize);
+		short dataLen = getLength();
+		return (short) (mTag.size() + TLVHelper.getLengthLength(dataLen) + dataLen);
 	}
 
 	/**
@@ -269,10 +269,10 @@ public abstract class BERTLV {
 			throws ArrayIndexOutOfBoundsException, NullPointerException {
 
 		if (berTlvArray == null)
-			throw new NullPointerException();
+			JCEnvironmentExceptions.throwNullPointerException();
 
 		if (bOff + bLen > berTlvArray.length)
-			throw new ArrayIndexOutOfBoundsException();
+			JCEnvironmentExceptions.throwArrayIndexOutOfBoundsException();
 
 		try {
 			short tlvLen = bOff;
@@ -291,7 +291,7 @@ public abstract class BERTLV {
 			tlvLen += dataLen;
 
 			if (bOff + tlvLen <= bLen) {
-				throw new TLVException(TLVException.MALFORMED_TLV);
+				TLVException.throwIt(TLVException.MALFORMED_TLV);
 			}
 			return true;
 		} catch (TLVException ex) {
@@ -328,7 +328,7 @@ public abstract class BERTLV {
 			throws ArrayIndexOutOfBoundsException, NullPointerException, TLVException {
 
 		if (berTLVArray == null || berTagArray == null)
-			throw new NullPointerException();
+			JCEnvironmentExceptions.throwNullPointerException();
 
 		short tagLen = BERTag.size(berTLVArray, bTLVOff);
 		return Util.arrayCopyNonAtomic(berTLVArray, bTLVOff, berTagArray, bTagOff, tagLen);
@@ -361,90 +361,35 @@ public abstract class BERTLV {
 			throws ArrayIndexOutOfBoundsException, NullPointerException, TLVException {
 
 		if (berTLVArray == null)
-			throw new NullPointerException();
+			JCEnvironmentExceptions.throwNullPointerException();
 
 		if (berTLVArray.length < bOff) {
-			throw new TLVException(TLVException.MALFORMED_TLV);
+			TLVException.throwIt(TLVException.MALFORMED_TLV);
 		}
 
 		short offset = bOff;
 		byte len = berTLVArray[offset++];
 		if (len >= 0) // 0~7F
 		{
-			return (short) (len & 0xff);
+			return (short) (len & 0x7f);
 		} else if (len == (byte) 0x81) {
 			if (berTLVArray.length < bOff + 1) {
-				throw new TLVException(TLVException.MALFORMED_TLV);
+				TLVException.throwIt(TLVException.MALFORMED_TLV);
 			}
 			return (short) (berTLVArray[offset] & 0xff);
 		} else if (len == (byte) 0x82) {
 			if (berTLVArray.length < bOff + 2) {
-				throw new TLVException(TLVException.MALFORMED_TLV);
+				TLVException.throwIt(TLVException.MALFORMED_TLV);
 			}
 			short val = Util.getShort(berTLVArray, offset);
 			if (val < 0) {
-				throw new TLVException(TLVException.TLV_LENGTH_GREATER_THAN_32767);
+				TLVException.throwIt(TLVException.TLV_LENGTH_GREATER_THAN_32767);
 			}
 			return val;
 		} else {
-			throw new TLVException(TLVException.TLV_LENGTH_GREATER_THAN_32767);
+			TLVException.throwIt(TLVException.TLV_LENGTH_GREATER_THAN_32767);
 		}
-	}
-
-	/**
-	 * Gets the data length required to represent value.
-	 * 
-	 * @param berTLVArray input byte array
-	 * @param bOff        offset within byte array containing the tlv length first
-	 *                    byte
-	 * @return Data length required to represent value
-	 */
-	protected static short getLengthLength(byte[] berTLVArray, short bOff) {
-		if (berTLVArray[bOff] >= 0) // 0~7F
-			return 1;
-		else
-			return (short) (1 + (berTLVArray[bOff] & 0x7F));
-	}
-
-	/**
-	 * Gets the data length required to represent value.
-	 * 
-	 * @param bLength Value length.
-	 * @return Data length required to represent value
-	 */
-	protected static short getLengthLength(short bLength) {
-		if (bLength < 128) {
-			return 1;
-		} else if (bLength < 256) {
-			return 2;
-		} else if (bLength < 65536) {
-			return 3;
-		} else {
-			return 4;
-		}
-	}
-
-	/**
-	 * Resizes data array.
-	 * 
-	 * @param numValueBytes is the number of Value bytes to allocate
-	 * @return true if capacity is sufficient, false otherwise
-	 */
-	protected boolean resizeDataBuffer(short numValueBytes) {
-
-		if (mData == null) {
-			mData = new byte[numValueBytes];
-			return true;
-		} else if (SUPPORT_EXPANSION) {
-			if (mData.length < numValueBytes) {
-				byte[] newArray = new byte[numValueBytes];
-				Util.arrayCopyNonAtomic(mData, (short) 0, newArray, (short) 0, mDataSize);
-				mData = newArray;
-			}
-			return true;
-		} else {
-			return false;
-		}
+		return len;
 	}
 
 	@Override
@@ -452,18 +397,33 @@ public abstract class BERTLV {
 		return getDescription((short) 0);
 	}
 
-	public abstract String getDescription(short level);
-	
-	public String drawLevel(short level) {
+	/**
+	 * [IMPLEMENTATION-SPECIFIC]
+	 * <p/>
+	 * Writes TLV data to output array.
+	 * 
+	 * @param outArray Output array.
+	 * @param bOff     Output array offset.
+	 * @return Offset of last data byte.
+	 */
+	protected abstract short writeData(byte[] outArray, short bOff);
 
-		StringBuilder sb = new StringBuilder();
-		short levelDrawer = level;
-		while (levelDrawer > 0) {
-			if (levelDrawer-- > 1)
-				sb.append("    ");
-			else
-				sb.append("+-- ");
-		}
-		return sb.toString();
-	}
+	/**
+	 * [IMPLEMENTATION-SPECIFIC]
+	 * <p/>
+	 * Gets data length.
+	 * 
+	 * @return Data length.
+	 */
+	protected abstract short getDataLength();
+
+	/**
+	 * [IMPLEMENTATION-SPECIFIC]
+	 * <p/>
+	 * Gets description of contents for {@link BERTLV}.
+	 * 
+	 * @param level Level of construction.
+	 * @return String description of contents.
+	 */
+	public abstract String getDescription(short level);
 }

@@ -1,8 +1,8 @@
 package javacardx.framework.tlv;
 
-import java.util.Arrays;
-
-import org.apache.commons.codec.binary.Hex;
+import com.jaloonz.tlv.utils.JCEnvironmentExceptions;
+import com.jaloonz.tlv.utils.LogHelper;
+import com.jaloonz.tlv.utils.TLVHelper;
 
 /**
  * The ConstructedBERTLV class encapsulates a constructed BER TLV structure. It
@@ -21,11 +21,11 @@ import org.apache.commons.codec.binary.Hex;
  * allocate new internal data. If the internal buffer overflows, and the
  * implementation supports automatic expansion which might require new data
  * allocation and possibly old data/object deletion, it is automatically made
- * larger. Otherwise a TLVException is thrown.
+ * larger. Otherwise a {@link TLVException} is thrown.
  * <p/>
- * The BERTLV class and the subclasses ConstructedBERTLV and PrimitiveBERTLV,
- * also provide static methods to parse or edit a TLV structure representation
- * in a byte array.
+ * The BERTLV class and the subclasses {@link ConstructedBERTLV} and
+ * {@link PrimitiveBERTLV}, also provide static methods to parse or edit a TLV
+ * structure representation in a byte array.
  */
 public class ConstructedBERTLV extends BERTLV {
 
@@ -80,52 +80,35 @@ public class ConstructedBERTLV extends BERTLV {
 			throws ArrayIndexOutOfBoundsException, NullPointerException, TLVException {
 
 		if (bArray == null)
-			throw new NullPointerException();
+			JCEnvironmentExceptions.throwNullPointerException();
 
 		if (bOff + bLen > bArray.length)
-			throw new ArrayIndexOutOfBoundsException();
+			JCEnvironmentExceptions.throwArrayIndexOutOfBoundsException();
 
-		short bOffset = bOff, bRemainingLength;
 		short tagLen, lenLen, dataLen;
 
-		mTag = BERTag.getInstance(bArray, bOffset);
-		tagLen = mTag.size();
-		lenLen = getLengthLength(bArray, (short) (bOffset + tagLen));
-		dataLen = getLength(bArray, (short) (bOffset + tagLen));
+		BERTag tag = BERTag.getInstance(bArray, bOff);
+		tagLen = tag.size();
+		lenLen = TLVHelper.getLengthLength(bArray, (short) (bOff + tagLen));
+		dataLen = getLength(bArray, (short) (bOff + tagLen));
 
-		bOffset += tagLen + lenLen;
-		bRemainingLength = dataLen;
+		if (!tag.isConstructed())
+			TLVException.throwIt(TLVException.MALFORMED_TLV);
 
-		while (bOffset < bArray.length && bRemainingLength > 0) {
-			if (bArray[bOffset] == ASN1_EOC) {
-				// Skip EOC character
-				bOffset++;
-				bRemainingLength--;
-			} else {
-				System.out.println(Hex.encodeHex(Arrays.copyOfRange(bArray,  bOffset, bOffset+bRemainingLength),false));
-				BERTLV tlv = BERTLV.getInstance(bArray, (short) bOffset, bRemainingLength);
-				resizeConstructedTLVArray((short) (mTlvCount + 1));
-				mlstTlvs[mTlvCount++] = tlv;
-				bOffset += tlv.size();
-				bRemainingLength -= tlv.size();
-			}
-		}
-
-		//if (bRemainingLength != 0)
-		//	throw new TLVException(TLVException.MALFORMED_TLV);
-
-		calculateTLVSize();
-		return mDataSize;
+		return init((ConstructedBERTag) tag, bArray, (short) (bOff + tagLen + lenLen), dataLen);
 	}
 
 	/**
 	 * (Re-)Initializes this ConstructedBERTLV object with the input tag and TLV
 	 * parameter. Note that a reference to the BER Tag object parameter is retained
-	 * by this object. If the input BER Tag object is modified, the TLV structure
-	 * encapsulated by this TLV instance is also modified. Similarly, a reference to
-	 * the BER TLV object parameter is also retained by this object. If the input
-	 * BER TLV object is modified, the TLV structure encapsulated by this TLV
-	 * instance is also modified.
+	 * by this object.
+	 * <p/>
+	 * If the input BER Tag object is modified, the TLV structure encapsulated by
+	 * this TLV instance is also modified. Similarly, a reference to the BER TLV
+	 * object parameter is also retained by this object.
+	 * <p/>
+	 * If the input BER TLV object is modified, the TLV structure encapsulated by
+	 * this TLV instance is also modified.
 	 * 
 	 * @param tag  a BERTag object
 	 * @param aTLV to use to initialize as the value of this TLV
@@ -146,7 +129,7 @@ public class ConstructedBERTLV extends BERTLV {
 	public short init(ConstructedBERTag tag, BERTLV aTLV) throws NullPointerException, TLVException {
 
 		if (tag == null || aTLV == null)
-			throw new NullPointerException();
+			JCEnvironmentExceptions.throwNullPointerException();
 
 		mTag = tag;
 
@@ -189,12 +172,26 @@ public class ConstructedBERTLV extends BERTLV {
 			throws ArrayIndexOutOfBoundsException, NullPointerException, TLVException {
 
 		if (tag == null || vArray == null)
-			throw new NullPointerException();
+			JCEnvironmentExceptions.throwNullPointerException();
 
 		mTag = tag;
 
-		BERTLV tlv = BERTLV.getInstance(vArray, vOff, vLen);
-		return append(tlv);
+		short bOffset = vOff, bRemainingLength = vLen;
+
+		while (bOffset < vArray.length && bRemainingLength > 0) {
+			if ((vArray[bOffset] & BERTag.MASK_TAG_NUMBER) == BERTag.ASN1_EOC) {
+				// Skip EOC character
+				bOffset++;
+				bRemainingLength--;
+			} else {
+				BERTLV tlv = BERTLV.getInstance(vArray, (short) bOffset, bRemainingLength);
+				append(tlv);
+				bOffset += tlv.size();
+				bRemainingLength -= tlv.size();
+			}
+		}
+
+		return size();
 	}
 
 	/**
@@ -218,9 +215,11 @@ public class ConstructedBERTLV extends BERTLV {
 	 *                              </ul>
 	 */
 	public short append(BERTLV aTLV) throws NullPointerException, TLVException {
+		if (!resizeConstructedTLVArray((short) (mTlvCount + 1)))
+			TLVException.throwIt(TLVException.INSUFFICIENT_STORAGE);
+
 		mlstTlvs[mTlvCount++] = aTLV;
-		calculateTLVSize();
-		return mDataSize;
+		return size();
 	}
 
 	/**
@@ -246,7 +245,7 @@ public class ConstructedBERTLV extends BERTLV {
 		short occurenceCounter = 0;
 		short idxToRemove = -1;
 
-		for (short idx = 0; idx < mTlvCount && idxToRemove != -1; idx++) {
+		for (short idx = 0; idx < mTlvCount && idxToRemove == -1; idx++) {
 			if (mlstTlvs[idx].getTag().equals(aTLV.getTag())) {
 				if (++occurenceCounter == occurrenceNum)
 					idxToRemove = idx;
@@ -254,17 +253,19 @@ public class ConstructedBERTLV extends BERTLV {
 		}
 
 		if (occurrenceNum <= 0 || occurrenceNum > occurenceCounter || occurenceCounter == 0)
-			throw new TLVException(TLVException.INVALID_PARAM);
+			TLVException.throwIt(TLVException.INVALID_PARAM);
 
 		if (idxToRemove != -1) {
-			for (short idx = idxToRemove; idx < mTlvCount; idx++) {
+			for (short idx = idxToRemove; idx < mTlvCount - 1; idx++) {
 				mlstTlvs[idx] = mlstTlvs[idx + 1];
+			}
+			for (short idx = mTlvCount; idx < mlstTlvs.length; idx++) {
+				mlstTlvs[idx] = null;
 			}
 			mTlvCount--;
 		}
 
-		calculateTLVSize();
-		return mDataSize;
+		return size();
 	}
 
 	/**
@@ -279,7 +280,7 @@ public class ConstructedBERTLV extends BERTLV {
 	public BERTLV find(BERTag tag) {
 		for (short idx = 0; idx < mTlvCount; idx++) {
 			try {
-				if (mlstTlvs[idx].getTag().equals(tag) || tag == null) {
+				if (tag == null || mlstTlvs[idx].getTag().equals(tag)) {
 					return mlstTlvs[idx];
 				}
 			} catch (TLVException e) {
@@ -317,24 +318,24 @@ public class ConstructedBERTLV extends BERTLV {
 		short occurenceCounter = 0;
 		short idxToStartFinding = -1;
 
-		for (short idx = 0; idx < mTlvCount && idxToStartFinding != -1; idx++) {
+		for (short idx = 0; idx < mTlvCount && idxToStartFinding == -1; idx++) {
 			if (mlstTlvs[idx] == aTLV) {
-				idxToStartFinding = idx;
+				idxToStartFinding = (short) (idx + 1);
 			}
 		}
 
 		if (occurrenceNum <= 0 || idxToStartFinding == -1)
-			throw new TLVException(TLVException.INVALID_PARAM);
+			TLVException.throwIt(TLVException.INVALID_PARAM);
 
 		for (short idx = idxToStartFinding; idx < mTlvCount; idx++) {
-			if (mlstTlvs[idx].getTag().equals(tag) || tag == null) {
+			if (tag == null || mlstTlvs[idx].getTag().equals(tag)) {
 				if (++occurenceCounter == occurrenceNum)
 					return mlstTlvs[idx];
 			}
 		}
 
 		if (occurrenceNum > occurenceCounter || occurenceCounter == 0)
-			throw new TLVException(TLVException.INVALID_PARAM);
+			TLVException.throwIt(TLVException.INVALID_PARAM);
 
 		return null;
 	}
@@ -365,11 +366,17 @@ public class ConstructedBERTLV extends BERTLV {
 	public static short append(byte[] berTLVInArray, short bTLVInOff, byte[] berTLVOutArray, short bTLVOutOff)
 			throws ArrayIndexOutOfBoundsException, NullPointerException, TLVException {
 
+		if (berTLVInArray == null || berTLVOutArray == null)
+			JCEnvironmentExceptions.throwNullPointerException();
+
 		BERTLV tlvToAppend = BERTLV.getInstance(berTLVInArray, bTLVInOff, (short) berTLVInArray.length);
-		ConstructedBERTLV tlvConstructed = (ConstructedBERTLV) BERTLV.getInstance(berTLVOutArray, bTLVOutOff,
-				(short) berTLVOutArray.length);
-		tlvConstructed.append(tlvToAppend);
-		return tlvConstructed.toBytes(berTLVOutArray, bTLVOutOff);
+		BERTLV tlvConstructed = BERTLV.getInstance(berTLVOutArray, bTLVOutOff, (short) berTLVOutArray.length);
+		if (!tlvConstructed.mTag.isConstructed())
+			TLVException.throwIt(TLVException.MALFORMED_TLV);
+
+		ConstructedBERTLV ctlv = (ConstructedBERTLV) tlvConstructed;
+		ctlv.append(tlvToAppend);
+		return ctlv.toBytes(berTLVOutArray, bTLVOutOff);
 	}
 
 	/**
@@ -449,12 +456,12 @@ public class ConstructedBERTLV extends BERTLV {
 			short bTagOff) throws ArrayIndexOutOfBoundsException, NullPointerException, TLVException {
 
 		if (berTLVArray == null)
-			throw new NullPointerException();
+			JCEnvironmentExceptions.throwNullPointerException();
 
 		short bOffset = (short) (bTLVOff + startOffset), bRemainingLength = (short) (berTLVArray.length - bTLVOff);
 		BERTag tagToFind = BERTag.getInstance(berTagArray, bTagOff);
 		while (bOffset < berTLVArray.length && bRemainingLength > 0) {
-			if (berTLVArray[bOffset++] == ASN1_EOC) {
+			if ((berTLVArray[bOffset++] & BERTag.MASK_TAG_NUMBER) == BERTag.ASN1_EOC) {
 				// Skip EOC character
 				bOffset++;
 				bRemainingLength--;
@@ -471,7 +478,23 @@ public class ConstructedBERTLV extends BERTLV {
 		return -1;
 	}
 
-	private short getDataSize() {
+	@Override
+	protected short writeData(byte[] outArray, short bOff) {
+		if (mlstTlvs == null)
+			return 0;
+
+		for (short idx = 0; idx < mTlvCount; idx++) {
+			try {
+				bOff += mlstTlvs[idx].toBytes(outArray, bOff);
+			} catch (ArrayIndexOutOfBoundsException | NullPointerException | TLVException e) {
+				// Should not happen
+			}
+		}
+		return bOff;
+	}
+
+	@Override
+	protected short getDataLength() {
 		if (mlstTlvs == null)
 			return 0;
 
@@ -486,24 +509,12 @@ public class ConstructedBERTLV extends BERTLV {
 		return dataLen;
 	}
 
-	private void calculateTLVSize() {
-		try {
-			short tagLen, lenLen, dataLen;
-			tagLen = mTag.size();
-			dataLen = getDataSize();
-			lenLen = BERTLV.getLengthLength(dataLen);
-			mDataSize = (short) (tagLen + lenLen + dataLen);
-		} catch (TLVException ex) {
-			mDataSize = 0;
-		}
-	}
-
 	@Override
 	public String getDescription(short level) {
 		StringBuilder sb = new StringBuilder();
-		sb.append(drawLevel(level));
+		sb.append(LogHelper.drawLevel(level));
 		if (mTag != null) {
-			sb.append(String.format("T=%s, L=%d (SubItems=%d)\n", mTag.toString(), mDataSize, mTlvCount));
+			sb.append(String.format("T=%s, L=%d (SubItems=%d)\n", mTag.toString(), getDataLength(), mTlvCount));
 			for (short idx = 0; idx < mTlvCount; idx++) {
 				BERTLV subTag = mlstTlvs[idx];
 				sb.append(subTag.getDescription((short) (level + 1)));
