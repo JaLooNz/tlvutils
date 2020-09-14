@@ -281,10 +281,7 @@ public abstract class BERTLV {
 			tagLen = BERTag.size(berTlvArray, tlvLen);
 			tlvLen += tagLen;
 
-			if (berTlvArray[tlvLen] >= 0) // 0~7F
-				lenLen = (short) (berTlvArray[tlvLen] & 0x7F);
-			else
-				lenLen = (short) (1 + (berTlvArray[tlvLen] & 0x7F));
+			lenLen = TLVHelper.getLengthLength(berTlvArray, tlvLen);
 			tlvLen += lenLen;
 
 			dataLen = getLength(berTlvArray, tlvLen);

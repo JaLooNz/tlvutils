@@ -29,8 +29,7 @@ import com.jaloonz.tlv.utils.TLVHelper;
  */
 public class ConstructedBERTLV extends BERTLV {
 
-	protected BERTLV[] mlstTlvs;
-	protected short mTlvCount;
+	protected SequentialBERTLV mSequentialTLVs;
 
 	/**
 	 * Constructor creates an empty ConstructedBERTLV object capable of
@@ -47,32 +46,7 @@ public class ConstructedBERTLV extends BERTLV {
 	 *                      </ul>
 	 */
 	public ConstructedBERTLV(short numTLVs) throws TLVException {
-		resizeConstructedTLVArray(numTLVs);
-		mTlvCount = 0;
-	}
-
-	/**
-	 * Resizes data array.
-	 * 
-	 * @param numTLVs is the number of contained TLVs to allocate
-	 * @return true if capacity is sufficient, false otherwise
-	 */
-	private boolean resizeConstructedTLVArray(short numTLVs) {
-
-		if (mlstTlvs == null) {
-			mlstTlvs = new BERTLV[numTLVs];
-			return true;
-		} else if (SUPPORT_EXPANSION) {
-			if (mlstTlvs.length < numTLVs) {
-				BERTLV[] newArray = new BERTLV[numTLVs];
-				for (short idx = 0; idx < mlstTlvs.length; idx++)
-					newArray[idx] = mlstTlvs[idx];
-				mlstTlvs = newArray;
-			}
-			return true;
-		} else {
-			return false;
-		}
+		mSequentialTLVs = new SequentialBERTLV(numTLVs);
 	}
 
 	@Override
@@ -175,22 +149,7 @@ public class ConstructedBERTLV extends BERTLV {
 			JCEnvironmentExceptions.throwNullPointerException();
 
 		mTag = tag;
-
-		short bOffset = vOff, bRemainingLength = vLen;
-
-		while (bOffset < vArray.length && bRemainingLength > 0) {
-			if ((vArray[bOffset] & BERTag.MASK_TAG_NUMBER) == BERTag.ASN1_EOC) {
-				// Skip EOC character
-				bOffset++;
-				bRemainingLength--;
-			} else {
-				BERTLV tlv = BERTLV.getInstance(vArray, (short) bOffset, bRemainingLength);
-				append(tlv);
-				bOffset += tlv.size();
-				bRemainingLength -= tlv.size();
-			}
-		}
-
+		mSequentialTLVs.init(vArray, vOff, vLen);
 		return size();
 	}
 
@@ -215,11 +174,8 @@ public class ConstructedBERTLV extends BERTLV {
 	 *                              </ul>
 	 */
 	public short append(BERTLV aTLV) throws NullPointerException, TLVException {
-		if (!resizeConstructedTLVArray((short) (mTlvCount + 1)))
-			TLVException.throwIt(TLVException.INSUFFICIENT_STORAGE);
 
-		mlstTlvs[mTlvCount++] = aTLV;
-		return size();
+		return mSequentialTLVs.append(aTLV);
 	}
 
 	/**
@@ -242,30 +198,7 @@ public class ConstructedBERTLV extends BERTLV {
 	 */
 	public short delete(BERTLV aTLV, short occurrenceNum) throws NullPointerException, TLVException {
 
-		short occurenceCounter = 0;
-		short idxToRemove = -1;
-
-		for (short idx = 0; idx < mTlvCount && idxToRemove == -1; idx++) {
-			if (mlstTlvs[idx].getTag().equals(aTLV.getTag())) {
-				if (++occurenceCounter == occurrenceNum)
-					idxToRemove = idx;
-			}
-		}
-
-		if (occurrenceNum <= 0 || occurrenceNum > occurenceCounter || occurenceCounter == 0)
-			TLVException.throwIt(TLVException.INVALID_PARAM);
-
-		if (idxToRemove != -1) {
-			for (short idx = idxToRemove; idx < mTlvCount - 1; idx++) {
-				mlstTlvs[idx] = mlstTlvs[idx + 1];
-			}
-			for (short idx = mTlvCount; idx < mlstTlvs.length; idx++) {
-				mlstTlvs[idx] = null;
-			}
-			mTlvCount--;
-		}
-
-		return size();
+		return mSequentialTLVs.delete(aTLV, occurrenceNum);
 	}
 
 	/**
@@ -278,16 +211,8 @@ public class ConstructedBERTLV extends BERTLV {
 	 * @return TLV object matching the indicated tag or null if none found.
 	 */
 	public BERTLV find(BERTag tag) {
-		for (short idx = 0; idx < mTlvCount; idx++) {
-			try {
-				if (tag == null || mlstTlvs[idx].getTag().equals(tag)) {
-					return mlstTlvs[idx];
-				}
-			} catch (TLVException e) {
-				// Continue
-			}
-		}
-		return null;
+
+		return mSequentialTLVs.find(tag);
 	}
 
 	/**
@@ -315,29 +240,7 @@ public class ConstructedBERTLV extends BERTLV {
 	 */
 	public BERTLV findNext(BERTag tag, BERTLV aTLV, short occurrenceNum) throws NullPointerException, TLVException {
 
-		short occurenceCounter = 0;
-		short idxToStartFinding = -1;
-
-		for (short idx = 0; idx < mTlvCount && idxToStartFinding == -1; idx++) {
-			if (mlstTlvs[idx] == aTLV) {
-				idxToStartFinding = (short) (idx + 1);
-			}
-		}
-
-		if (occurrenceNum <= 0 || idxToStartFinding == -1)
-			TLVException.throwIt(TLVException.INVALID_PARAM);
-
-		for (short idx = idxToStartFinding; idx < mTlvCount; idx++) {
-			if (tag == null || mlstTlvs[idx].getTag().equals(tag)) {
-				if (++occurenceCounter == occurrenceNum)
-					return mlstTlvs[idx];
-			}
-		}
-
-		if (occurrenceNum > occurenceCounter || occurenceCounter == 0)
-			TLVException.throwIt(TLVException.INVALID_PARAM);
-
-		return null;
+		return mSequentialTLVs.findNext(tag, aTLV, occurrenceNum);
 	}
 
 	/**
@@ -480,33 +383,16 @@ public class ConstructedBERTLV extends BERTLV {
 
 	@Override
 	protected short writeData(byte[] outArray, short bOff) {
-		if (mlstTlvs == null)
-			return 0;
-
-		for (short idx = 0; idx < mTlvCount; idx++) {
-			try {
-				bOff += mlstTlvs[idx].toBytes(outArray, bOff);
-			} catch (ArrayIndexOutOfBoundsException | NullPointerException | TLVException e) {
-				// Should not happen
-			}
-		}
+		mSequentialTLVs.writeData(outArray, bOff);
 		return bOff;
 	}
 
 	@Override
 	protected short getDataLength() {
-		if (mlstTlvs == null)
+		if (mSequentialTLVs == null)
 			return 0;
 
-		short dataLen;
-		dataLen = 0;
-		for (short idx = 0; idx < mTlvCount; idx++)
-			try {
-				dataLen += mlstTlvs[idx].size();
-			} catch (TLVException e) {
-				// Ignore empty or larger than 32767 (signed short)
-			}
-		return dataLen;
+		return mSequentialTLVs.getDataLength();
 	}
 
 	@Override
@@ -514,11 +400,9 @@ public class ConstructedBERTLV extends BERTLV {
 		StringBuilder sb = new StringBuilder();
 		sb.append(LogHelper.drawLevel(level));
 		if (mTag != null) {
-			sb.append(String.format("T=%s, L=%d (SubItems=%d)\n", mTag.toString(), getDataLength(), mTlvCount));
-			for (short idx = 0; idx < mTlvCount; idx++) {
-				BERTLV subTag = mlstTlvs[idx];
-				sb.append(subTag.getDescription((short) (level + 1)));
-			}
+			sb.append(String.format("T=%s, L=%d (SubItems=%d)\n", mTag.toString(), getDataLength(),
+					mSequentialTLVs.getItemCount()));
+			sb.append(mSequentialTLVs.getDescription((short) (level + 1)));
 		} else {
 			sb.append("Invalid TLV\n");
 		}

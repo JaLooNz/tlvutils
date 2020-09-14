@@ -16,6 +16,7 @@ import org.apache.commons.codec.binary.Hex;
 import javacardx.framework.tlv.BERTLV;
 import javacardx.framework.tlv.BERTag;
 import javacardx.framework.tlv.PrimitiveBERTLV;
+import javacardx.framework.tlv.SequentialBERTLV;
 import javacardx.framework.tlv.TLVException;
 
 import org.junit.Test;
@@ -204,11 +205,11 @@ public class TLVTester {
 	}
 
 	@Test
-	public void testDecodingConstructedMultipleSequentialTLV() {
+	public void testTLVSequentialParsing() {
 		try {
-			byte[] data8 = Hex.decodeHex(
+			byte[] apduSelectAidGlobalPlatform = Hex.decodeHex(
 					"610A4F08A000000151000000610E4F0CA000000151535041534B4D5361104F0EA0000001515350414C43434D414D61104D0EA0000001515350414C43434D444D610F4F0DA0000001515350415333535344610C4F0AA9A8A7A6A5A4A3A2A1A0610C4F0AA9A8A7A6A5A4A3A2A1A1610E4F0CA00000000353504200014201610E4F0CA00000015153504341534400610B4F09A00000015141434C0061124F10A0000000770107821D0000FE0000020061124F10A00000022053454353455350524F543161124F10A00000022053454353544F524147453161124F10A0000002201503010300000041524143610C4F0AA0A1A2A3A4A5A6A7A8A9610C4F0AA0A1A2A3A4A5A6A7A8AA61124F10A000000077020760110000FE0000FE00610B4F09A00000015143525300");
-			BERTLV tlv = BERTLV.getInstance(data8, (short) 0, (short) data8.length);
+			SequentialBERTLV tlv = SequentialBERTLV.getInstance(apduSelectAidGlobalPlatform, (short) 0, (short) apduSelectAidGlobalPlatform.length);
 			System.out.println(tlv.toString());
 		} catch (TLVException ex) {
 			ex.printStackTrace();
@@ -221,8 +222,8 @@ public class TLVTester {
 	@Test
 	public void testTLVDecodingPPSESelection() {
 		try {
-			byte[] data8 = Hex.decodeHex("6F23840E325041592E5359532E4444463031A511BF0C0E610C4F07A0000000031010870101");
-			BERTLV tlv = BERTLV.getInstance(data8, (short) 0, (short) data8.length);
+			byte[] apduSelectAidPpseSelection = Hex.decodeHex("6F23840E325041592E5359532E4444463031A511BF0C0E610C4F07A0000000031010870101");
+			BERTLV tlv = BERTLV.getInstance(apduSelectAidPpseSelection, (short) 0, (short) apduSelectAidPpseSelection.length);
 			System.out.println(tlv.toString());
 		} catch (TLVException ex) {
 			ex.printStackTrace();
