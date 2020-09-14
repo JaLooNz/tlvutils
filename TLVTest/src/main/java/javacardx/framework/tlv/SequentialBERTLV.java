@@ -349,7 +349,10 @@ public class SequentialBERTLV {
 
 	@Override
 	public String toString() {
-		return getDescription((short) 0);
+		StringBuilder sb = new StringBuilder();
+		sb.append(String.format("Sequential TLV (Items = %d)\n", mTlvCount));
+		sb.append(getDescription((short) 0));
+		return sb.toString();
 	}
 
 	/**
