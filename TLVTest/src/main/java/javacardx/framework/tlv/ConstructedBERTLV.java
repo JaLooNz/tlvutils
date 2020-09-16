@@ -383,8 +383,7 @@ public class ConstructedBERTLV extends BERTLV {
 
 	@Override
 	protected short writeData(byte[] outArray, short bOff) {
-		mSequentialTLVs.writeData(outArray, bOff);
-		return bOff;
+		return mSequentialTLVs.writeData(outArray, bOff);
 	}
 
 	@Override

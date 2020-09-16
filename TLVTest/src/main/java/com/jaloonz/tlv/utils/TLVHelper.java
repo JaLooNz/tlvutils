@@ -1,5 +1,6 @@
 package com.jaloonz.tlv.utils;
 
+import javacardx.framework.Util;
 import javacardx.framework.tlv.BERTag;
 import javacardx.framework.tlv.ConstructedBERTLV;
 import javacardx.framework.tlv.ConstructedBERTag;
@@ -138,12 +139,42 @@ public class TLVHelper {
 	 *                                        parameter is negative
 	 * @throws NullPointerException           if outArray is null
 	 */
+	public static byte[] makeTLV(short tag) {
+		return makeTLV(tag, new byte[] {});
+	}
+
+	/**
+	 * Writes the BER TLV bytes and returns it as a byte array
+	 *
+	 * @param tag       encodes the tag value.
+	 * @param inputData input data array
+	 * @return TLV byte array
+	 * @throws ArrayIndexOutOfBoundsException if accessing the output array would
+	 *                                        cause access of data outside array
+	 *                                        bounds, or if the array offset
+	 *                                        parameter is negative
+	 * @throws NullPointerException           if outArray is null
+	 */
 	public static byte[] makeTLV(short tag, byte[] inputData) {
 		short dataLen = (short) inputData.length;
 		short tlvLen = (short) (getTagLength(tag) + getLengthLength(dataLen) + dataLen);
 		byte[] tlvData = new byte[tlvLen];
 		makeTLV(tag, inputData, tlvData, (short) 0);
 		return tlvData;
+	}
+
+	/**
+	 * Concatenates the TLV arrays.
+	 * 
+	 * @param tlv1 TLV array 1.
+	 * @param tlv2 TLV array 2.
+	 * @return TLV array.
+	 */
+	public static byte[] concatTLV(byte[] tlv1, byte[] tlv2) {
+		byte[] newArray = new byte[tlv1.length + tlv2.length];
+		Util.arrayCopyNonAtomic(tlv1, (short) 0, newArray, (short) 0, (short) tlv1.length);
+		Util.arrayCopyNonAtomic(tlv2, (short) 0, newArray, (short) tlv1.length, (short) tlv2.length);
+		return newArray;
 	}
 
 	/**

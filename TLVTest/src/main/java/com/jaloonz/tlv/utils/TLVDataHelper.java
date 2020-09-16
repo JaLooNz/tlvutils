@@ -38,20 +38,30 @@ public class TLVDataHelper {
 			if (tlv.getTag().isConstructed()) {
 
 				ConstructedBERTLV ctlv = (ConstructedBERTLV) tlv;
-				BERTLV innerTlv = ctlv.find(null);
-				do {
-					if (innerTlv != null) {
-						if (!updateTLVStructureData(innerTlv, tlvArrays, bRemoveMissing)) {
-							if (bRemoveMissing) {
-								ctlv.delete(innerTlv, (short) 1);
-								innerTlv = ctlv.find(null);
-							}
-						} else {
-							bValuePresent = true;
+				BERTLV currTlv, lastTlv;
+
+				currTlv = ctlv.find(null);
+				lastTlv = null;
+				while (currTlv != null) {
+					boolean bTlvDeleted = false;
+					if (!updateTLVStructureData(currTlv, tlvArrays, bRemoveMissing)) {
+						if (bRemoveMissing) {
+							// No sub-element in constructed tag, remove constructed tag
+							ctlv.delete(currTlv, (short) 1);
+							bTlvDeleted = true;
 						}
+					} else {
+						bValuePresent = true;
 					}
-					innerTlv = ctlv.findNext(null, innerTlv, (short) 1);
-				} while (innerTlv != null);
+
+					if (!bTlvDeleted)
+						lastTlv = currTlv;
+
+					if (lastTlv == null)
+						currTlv = ctlv.find(null);
+					else
+						currTlv = ctlv.findNext(null, lastTlv, (short) 1);
+				}
 
 			} else {
 

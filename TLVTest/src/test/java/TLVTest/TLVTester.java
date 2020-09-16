@@ -170,7 +170,8 @@ public class TLVTester {
 			byte[] bufferTlvSrcArray = Hex.decodeHex("C801000000000000000000");
 
 			byte[] dataToAppend = new byte[] { 0x12, 0x34, 0x56, 0x78 };
-			PrimitiveBERTLV.appendValue(bufferTlvSrcArray, (short) 0, dataToAppend, (short) 0, (short) dataToAppend.length);
+			PrimitiveBERTLV.appendValue(bufferTlvSrcArray, (short) 0, dataToAppend, (short) 0,
+					(short) dataToAppend.length);
 
 			byte[] expected = Hex.decodeHex("C8050012345678");
 			assertArrayEquals(Arrays.copyOf(bufferTlvSrcArray, expected.length), expected);
@@ -189,7 +190,8 @@ public class TLVTester {
 			byte[] bufferTlvSrcArray = Hex.decodeHex("C801000000000000000000");
 			byte[] dataToAppend = new byte[] { 0x12, 0x34, 0x56, 0x78 };
 
-			PrimitiveBERTLV tlv = (PrimitiveBERTLV) BERTLV.getInstance(bufferTlvSrcArray, (short) 0, (short) bufferTlvSrcArray.length);
+			PrimitiveBERTLV tlv = (PrimitiveBERTLV) BERTLV.getInstance(bufferTlvSrcArray, (short) 0,
+					(short) bufferTlvSrcArray.length);
 			tlv.replaceValue(dataToAppend, (short) 0, (short) dataToAppend.length);
 			tlv.toBytes(bufferTlvSrcArray, (short) 0);
 
@@ -209,7 +211,8 @@ public class TLVTester {
 		try {
 			byte[] apduRspSelectAidGlobalPlatform = Hex.decodeHex(
 					"610A4F08A000000151000000610E4F0CA000000151535041534B4D5361104F0EA0000001515350414C43434D414D61104D0EA0000001515350414C43434D444D610F4F0DA0000001515350415333535344610C4F0AA9A8A7A6A5A4A3A2A1A0610C4F0AA9A8A7A6A5A4A3A2A1A1610E4F0CA00000000353504200014201610E4F0CA00000015153504341534400610B4F09A00000015141434C0061124F10A0000000770107821D0000FE0000020061124F10A00000022053454353455350524F543161124F10A00000022053454353544F524147453161124F10A0000002201503010300000041524143610C4F0AA0A1A2A3A4A5A6A7A8A9610C4F0AA0A1A2A3A4A5A6A7A8AA61124F10A000000077020760110000FE0000FE00610B4F09A00000015143525300");
-			SequentialBERTLV tlv = SequentialBERTLV.getInstance(apduRspSelectAidGlobalPlatform, (short) 0, (short) apduRspSelectAidGlobalPlatform.length);
+			SequentialBERTLV tlv = SequentialBERTLV.getInstance(apduRspSelectAidGlobalPlatform, (short) 0,
+					(short) apduRspSelectAidGlobalPlatform.length);
 			System.out.println(tlv.toString());
 		} catch (TLVException ex) {
 			ex.printStackTrace();
@@ -222,7 +225,8 @@ public class TLVTester {
 	@Test
 	public void testTLVDecodingPPSESelection() {
 		try {
-			byte[] apduRspSelectAidPpse = Hex.decodeHex("6F23840E325041592E5359532E4444463031A511BF0C0E610C4F07A0000000031010870101");
+			byte[] apduRspSelectAidPpse = Hex
+					.decodeHex("6F23840E325041592E5359532E4444463031A511BF0C0E610C4F07A0000000031010870101");
 			BERTLV tlv = BERTLV.getInstance(apduRspSelectAidPpse, (short) 0, (short) apduRspSelectAidPpse.length);
 			System.out.println(tlv.toString());
 		} catch (TLVException ex) {
@@ -279,27 +283,27 @@ public class TLVTester {
 	public void testManualCreateTLVStructureList() {
 
 		try {
-			byte[] apduRspBuffer = new byte[256];
-			short apduOffset = 0;
-			byte[] dataBuffer = new byte[256];
-			short dataOffset = 0;
-			dataOffset += TLVHelper.makeTLV((short) 0x93, TLVDataHelper.EMPTY_ARRAY, dataBuffer, dataOffset);
-			dataOffset += TLVHelper.makeTLV((short) 0x42, TLVDataHelper.EMPTY_ARRAY, dataBuffer, dataOffset);
-			dataOffset += TLVHelper.makeTLV((short) 0x5F20, TLVDataHelper.EMPTY_ARRAY, dataBuffer, dataOffset);
-			dataOffset += TLVHelper.makeTLV((short) 0x95, TLVDataHelper.EMPTY_ARRAY, dataBuffer, dataOffset);
-			dataOffset += TLVHelper.makeTLV((short) 0x5F25, TLVDataHelper.EMPTY_ARRAY, dataBuffer, dataOffset);
-			dataOffset += TLVHelper.makeTLV((short) 0x5F24, TLVDataHelper.EMPTY_ARRAY, dataBuffer, dataOffset);
-			dataOffset += TLVHelper.makeTLV((short) 0x53, TLVDataHelper.EMPTY_ARRAY, dataBuffer, dataOffset);
-			dataOffset += TLVHelper.makeTLV((short) 0x73, TLVDataHelper.EMPTY_ARRAY, dataBuffer, dataOffset);
-			dataOffset += TLVHelper.makeTLV((short) 0xBF20, TLVDataHelper.EMPTY_ARRAY, dataBuffer, dataOffset);
-			dataOffset += TLVHelper.makeTLV((short) 0x7F49, TLVDataHelper.EMPTY_ARRAY, dataBuffer, dataOffset);
-			dataOffset += TLVHelper.makeTLV((short) 0x5F37, TLVDataHelper.EMPTY_ARRAY, dataBuffer, dataOffset);
 
-			apduOffset += TLVHelper.makeTLV((short) 0x7F21, dataBuffer, (short) 0, dataOffset, apduRspBuffer,
-					apduOffset);
+			byte[] publicKeyParameters = TLVHelper.makeTLV((short) 0x7F49,
+					TLVHelper.concatTLV(TLVHelper.makeTLV((short) 0x90), TLVHelper.makeTLV((short) 0xD0)));
 
-			BERTLV tlv = BERTLV.getInstance(apduRspBuffer, (short) 0, (short) apduOffset);
-			// System.out.println(tlv.toString());
+			byte[] certificateData;
+			certificateData = TLVHelper.makeTLV((short) 0x93);
+			certificateData = TLVHelper.concatTLV(certificateData, TLVHelper.makeTLV((short) 0x42));
+			certificateData = TLVHelper.concatTLV(certificateData, TLVHelper.makeTLV((short) 0x5F20));
+			certificateData = TLVHelper.concatTLV(certificateData, TLVHelper.makeTLV((short) 0x95));
+			certificateData = TLVHelper.concatTLV(certificateData, TLVHelper.makeTLV((short) 0x5F25));
+			certificateData = TLVHelper.concatTLV(certificateData, TLVHelper.makeTLV((short) 0x5F24));
+			certificateData = TLVHelper.concatTLV(certificateData, TLVHelper.makeTLV((short) 0x53));
+			certificateData = TLVHelper.concatTLV(certificateData, TLVHelper.makeTLV((short) 0x73));
+			certificateData = TLVHelper.concatTLV(certificateData, TLVHelper.makeTLV((short) 0xBF20));
+			certificateData = TLVHelper.concatTLV(certificateData, publicKeyParameters);
+			certificateData = TLVHelper.concatTLV(certificateData, TLVHelper.makeTLV((short) 0x5F37));
+
+			byte[] apduRspBuffer = TLVHelper.makeTLV((short) 0x7F21, certificateData);
+
+			BERTLV tlv = BERTLV.getInstance(apduRspBuffer, (short) 0, (short) apduRspBuffer.length);
+			System.out.println(tlv.toString());
 
 			byte[] structure = TLVDataHelper.writeTLVStructure(tlv);
 			String result = Hex.encodeHexString(structure, false);
@@ -346,9 +350,14 @@ public class TLVTester {
 			byte[] tlvData = TLVDataHelper.writeTLVWithValues(structure, dataList, false);
 			String result = Hex.encodeHexString(tlvData, false);
 			System.out.println(result);
-			assertTrue("Output data error", "6F348407A0000000031010A5299F381B9F66049F02069F03069F1A0295055F2A029A039C019F37049F4E14BF0C089F5A054007020702".equals(result));
 
-		} catch (DecoderException e) {
+			BERTLV tlv = BERTLV.getInstance(tlvData, (short) 0, (short) tlvData.length);
+			System.out.println(tlv.toString());
+			assertTrue("Output data error",
+					"6F348407A0000000031010A5299F381B9F66049F02069F03069F1A0295055F2A029A039C019F37049F4E14BF0C089F5A054007020702"
+							.equals(result));
+
+		} catch (DecoderException | ArrayIndexOutOfBoundsException | NullPointerException | TLVException e) {
 			fail("Other critical errors");
 		}
 	}
@@ -372,7 +381,7 @@ public class TLVTester {
 			fail("Other critical errors");
 		}
 	}
-	
+
 	@Test
 	public void testBuildADFSelectionRemoveEmpty() {
 
@@ -403,9 +412,10 @@ public class TLVTester {
 			byte[] KEY_USAGE = new byte[] { 'A', 'B', 'C' };
 			byte[] EFFECTIVE_DATE = new byte[] { 0x20, 0x20, 0x01, 0x01 };
 			byte[] EXPIRATION_DATE = new byte[] { 0x20, 0x25, 0x01, 0x01 };
-			byte[] PUBLIC_KEY = Hex.decodeHex("04E2B5B7FAA4FE028949636425E68E79B6359E927253A460776CE34B8D0574E44F");
-
-			byte[] structure = Hex.decodeHex("7F210F930042005F200095005F25005F2400");
+			byte[] PUBLIC_KEY_POINT = Hex.decodeHex("E2B5B7FAA4FE028949636425E68E79B6359E927253A460776CE34B8D0574E44F");
+			byte[] KEY_REFERENCE_PARAMETER = Hex.decodeHex("01");
+			
+			byte[] structure = Hex.decodeHex("7F2120930042005F200095005F25005F240053007300BF20007F49049000D0005F3700");
 
 			Map<Short, byte[]> dataList = new HashMap<>();
 			dataList.put((short) 0x93, CERT_SERIAL_NUMBER);
@@ -414,15 +424,20 @@ public class TLVTester {
 			dataList.put((short) 0x95, KEY_USAGE);
 			dataList.put((short) 0x5F25, EFFECTIVE_DATE);
 			dataList.put((short) 0x5F24, EXPIRATION_DATE);
-			dataList.put((short) 0x7F49, PUBLIC_KEY);
+			dataList.put((short) 0x90, PUBLIC_KEY_POINT);
+			dataList.put((short) 0xD0, KEY_REFERENCE_PARAMETER);
 
 			byte[] tlvData = TLVDataHelper.writeTLVWithValues(structure, dataList, true);
 
 			String result = Hex.encodeHexString(tlvData, false);
 			System.out.println(result);
-			assertTrue("Structural data output error", "7F211F9301014201015F200341424395034142435F2504202001015F240420250101".equals(result));
-			
-		} catch (DecoderException | ArrayIndexOutOfBoundsException | NullPointerException e) {
+
+			BERTLV tlv = BERTLV.getInstance(tlvData, (short) 0, (short) tlvData.length);
+			System.out.println(tlv.toString());
+			assertTrue("Structural data output error",
+					"7F21479301014201015F200341424395034142435F2504202001015F2404202501017F49259020E2B5B7FAA4FE028949636425E68E79B6359E927253A460776CE34B8D0574E44FD00101".equals(result));
+
+		} catch (DecoderException | ArrayIndexOutOfBoundsException | NullPointerException | TLVException e) {
 			fail("Other critical errors");
 		}
 	}
