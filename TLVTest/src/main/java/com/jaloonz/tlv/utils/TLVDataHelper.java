@@ -1,5 +1,6 @@
 package com.jaloonz.tlv.utils;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import javacardx.framework.tlv.BERTLV;
@@ -15,6 +16,39 @@ import javacardx.framework.tlv.TLVException;
 public class TLVDataHelper {
 
 	public static final byte[] EMPTY_ARRAY = new byte[0];
+
+	/**
+	 * Reads TLV structure with data to data map.
+	 * 
+	 * @param tlv       TLV structure.
+	 * @param tlvArrays TLV data array.
+	 * @return True if value present, false if values missing.
+	 */
+	private static void readTLVStructureData(BERTLV tlv, Map<Short, byte[]> dataMap) {
+
+		try {
+			if (tlv.getTag().isConstructed()) {
+
+				ConstructedBERTLV ctlv = (ConstructedBERTLV) tlv;
+				BERTLV currTlv;
+
+				currTlv = ctlv.find(null);
+				while (currTlv != null) {
+					readTLVStructureData(currTlv, dataMap);
+					currTlv = ctlv.findNext(null, currTlv, (short) 1);
+				}
+
+			} else {
+
+				PrimitiveBERTLV ptlv = (PrimitiveBERTLV) tlv;
+				short tag = TLVHelper.getTag(tlv.getTag());
+				if (!dataMap.containsKey(tag))
+					dataMap.put(tag, ptlv.mData);
+			}
+		} catch (TLVException e) {
+			// Ignore TLVException
+		}
+	}
 
 	/**
 	 * Generates TLV structure with data from data map.
@@ -101,7 +135,7 @@ public class TLVDataHelper {
 	 *                       set to 0 length.
 	 * @return TLV structure with values.
 	 */
-	public static byte[] writeTLVWithValues(byte[] tlvStructure, Map<Short, byte[]> tlvArrays, boolean bRemoveMissing) {
+	public static byte[] writeTLVData(byte[] tlvStructure, Map<Short, byte[]> tlvArrays, boolean bRemoveMissing) {
 		try {
 			BERTLV tlv = BERTLV.getInstance(tlvStructure, (short) 0, (short) tlvStructure.length);
 			updateTLVStructureData(tlv, tlvArrays, bRemoveMissing);
@@ -110,6 +144,26 @@ public class TLVDataHelper {
 			byte[] structure = new byte[structureLen];
 			tlv.toBytes(structure, (short) 0);
 			return structure;
+		} catch (NullPointerException | TLVException e) {
+			return null;
+		}
+	}
+
+	/**
+	 * Reads TLV data from byte array to data map.
+	 * <p/>
+	 * Only primitive TLV values are read and stored to data map, constructed TLVs
+	 * are parsed. Duplicate map values are ignored.
+	 * 
+	 * @param tlvData TLV byte array.
+	 * @return TLV data map, or null if invalid TLV.
+	 */
+	public static Map<Short, byte[]> readTLVRead(byte[] tlvData) {
+		Map<Short, byte[]> dataMap = new HashMap<>();
+		try {
+			BERTLV tlv = BERTLV.getInstance(tlvData, (short) 0, (short) tlvData.length);
+			readTLVStructureData(tlv, dataMap);
+			return dataMap;
 		} catch (NullPointerException | TLVException e) {
 			return null;
 		}

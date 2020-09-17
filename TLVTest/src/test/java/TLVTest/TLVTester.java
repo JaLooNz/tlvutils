@@ -271,7 +271,7 @@ public class TLVTester {
 	public void testTLVDecodingReadRecord() {
 		try {
 			byte[] apduRspReadRecord = Hex.decodeHex(
-					"70375F280207029F0702C0009F19060400100302735F3401009F241D5630303130303134363136323038343435323437383432393538323830");
+					"70375F280207029F0702C0009F19060400100302735F3401009F241D5930303030303030303030303030303030303030303030303030303030");
 			BERTLV tlv = BERTLV.getInstance(apduRspReadRecord, (short) 0, (short) apduRspReadRecord.length);
 			System.out.println(tlv.toString());
 		} catch (Exception | TLVException ex) {
@@ -347,7 +347,7 @@ public class TLVTester {
 			dataList.put((short) 0x9F38, _9F38);
 			dataList.put((short) 0x84, _84);
 
-			byte[] tlvData = TLVDataHelper.writeTLVWithValues(structure, dataList, false);
+			byte[] tlvData = TLVDataHelper.writeTLVData(structure, dataList, false);
 			String result = Hex.encodeHexString(tlvData, false);
 			System.out.println(result);
 
@@ -372,7 +372,7 @@ public class TLVTester {
 			Map<Short, byte[]> dataList = new HashMap<>();
 			dataList.put((short) 0x84, _84);
 
-			byte[] tlvData = TLVDataHelper.writeTLVWithValues(structure, dataList, false);
+			byte[] tlvData = TLVDataHelper.writeTLVData(structure, dataList, false);
 			String result = Hex.encodeHexString(tlvData, false);
 			System.out.println(result);
 			assertTrue("Output data error", "6F148407A0000000031010A5099F3800BF0C039F5A00".equals(result));
@@ -392,7 +392,7 @@ public class TLVTester {
 			Map<Short, byte[]> dataList = new HashMap<>();
 			dataList.put((short) 0x84, _84);
 
-			byte[] tlvData = TLVDataHelper.writeTLVWithValues(structure, dataList, true);
+			byte[] tlvData = TLVDataHelper.writeTLVData(structure, dataList, true);
 			String result = Hex.encodeHexString(tlvData, false);
 			System.out.println(result);
 			assertTrue("Output data error", "6F098407A0000000031010".equals(result));
@@ -427,7 +427,7 @@ public class TLVTester {
 			dataList.put((short) 0x90, PUBLIC_KEY_POINT);
 			dataList.put((short) 0xD0, KEY_REFERENCE_PARAMETER);
 
-			byte[] tlvData = TLVDataHelper.writeTLVWithValues(structure, dataList, true);
+			byte[] tlvData = TLVDataHelper.writeTLVData(structure, dataList, true);
 
 			String result = Hex.encodeHexString(tlvData, false);
 			System.out.println(result);
@@ -438,6 +438,21 @@ public class TLVTester {
 					"7F21479301014201015F200341424395034142435F2504202001015F2404202501017F49259020E2B5B7FAA4FE028949636425E68E79B6359E927253A460776CE34B8D0574E44FD00101".equals(result));
 
 		} catch (DecoderException | ArrayIndexOutOfBoundsException | NullPointerException | TLVException e) {
+			fail("Other critical errors");
+		}
+	}
+	
+
+	@Test
+	public void testReadTLVDataToDataMap() {
+
+		try {
+			byte[] apduRspReadRecord = Hex.decodeHex(
+					"70375F280207029F0702C0009F19060400100302735F3401009F241D5930303030303030303030303030303030303030303030303030303030");
+			Map<Short, byte[]> dataMap = TLVDataHelper.readTLVRead(apduRspReadRecord);
+			assertEquals(dataMap.size(), 4);
+			
+		} catch (DecoderException | ArrayIndexOutOfBoundsException | NullPointerException e) {
 			fail("Other critical errors");
 		}
 	}

@@ -35,8 +35,8 @@ import javacardx.framework.Util;
  */
 public class PrimitiveBERTLV extends BERTLV {
 
-	protected byte[] mData;
-	protected short mDataSize = 0;
+	public byte[] mData;
+	public short mDataSize = 0;
 
 	/**
 	 * Constructor creates an empty PrimitiveBERTLV object capable of encapsulating

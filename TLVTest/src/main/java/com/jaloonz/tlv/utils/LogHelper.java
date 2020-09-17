@@ -9,7 +9,7 @@ public class LogHelper {
 	 * @return String representing level.
 	 */
 	public static String drawLevel(short level) {
-	
+
 		StringBuilder sb = new StringBuilder();
 		short levelDrawer = level;
 		while (levelDrawer > 0) {
